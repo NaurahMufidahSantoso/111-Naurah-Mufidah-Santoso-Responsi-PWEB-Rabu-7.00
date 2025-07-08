@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daftar Belanja NawNaw</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+             <!-- Hiasan di pojok kiri dan kanan -->
+            <div class="decorative-corner top-left"></div>
+            <div class="decorative-corner top-right"></div>
+
+             <!-- Judul Halaman -->
+            <h1>Daftar Belanja NawNaw</h1>
+
+            <div class="shopping-list" id="shoppingList"> <!--Ini adalah tempat kosong, nanti JavaScript yang isi otomatis barang-barangnya. 
+                id="shoppingList" biar JavaScript gampang manggilnya.-->
+                <!-- List dimuat dari JavaScript -->
+            </div>
+
+            <!-- Form Tambah Barang -->
+            <div class="add-section">
+                <form id="addForm">
+                    <!-- Inputan Tambah Barang Baru -->
+                    <input type="text" id="newItem" placeholder="Tambah item baru..." class="add-input" required>
+                    <div class="button-group">
+                         <!-- Tombol Reset -->
+                        <button type="button" id="resetBtn" class="btn btn-secondary">Kembali</button>
+                        <!-- Tombol Tambah Barang -->
+                        <button type="submit" class="btn btn-primary">Tambah Barang</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Konfirmasi -->
+    <div id="confirmModal" class="modal">
+       <!-- (Modal itu isinya pertanyaan kayak kotak pertanyaan penting: “Apakah kamu yakin mau hapus item ini?”) -->
+        <div class="modal-content">
+            <h2>Konfirmasi</h2>
+            <p id="confirmMessage"></p>
+            <div class="modal-buttons">
+                <!-- Tombol Oke dan Batal -->
+                <button id="confirmOk" class="btn btn-primary">Oke</button>
+                <button id="confirmCancel" class="btn btn-secondary">Batal</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    const API_URL = "proses.php"; // Lokasi file PHP sebagai API (jembatan penghubung antar aplikasi) 
+    let shoppingList = []; // Array untuk nyimpan data daftar belanja
+
+ // Saat halaman dimuat pertama kali
+    document.addEventListener("DOMContentLoaded", () => {
+        loadListFromServer(); // Ambil data dari server
+        // Event listener tombol-tombol
+        document.getElementById("addForm").addEventListener("submit", addItem);
+        document.getElementById("resetBtn").addEventListener("click", resetList);
+        document.getElementById("confirmOk").addEventListener("click", () => { hideModal(); pendingAction?.(); pendingAction = null; });
+        document.getElementById("confirmCancel").addEventListener("click", hideModal);
+    });
+
+    // Tampilkan isi shoppingList ke halaman
+    function renderList() {
+        const shoppingListElement = document.getElementById("shoppingList");
+
+        // Kalau kosong tampilkan pesan kosong
+        shoppingListElement.innerHTML = shoppingList.length ? "" : `<div class="empty-state"><h3>Daftar belanja kosong</h3><p>Tambahkan item pertama Anda!</p></div>`;
+
+ // Looping array shoppingList lalu tampilkan tiap itemnya
+        shoppingList.forEach((item, index) => {
+            shoppingListElement.innerHTML += `
+                <div class="list-item">
+                    <span class="item-name">${escapeHtml(item)}</span>
+                    <button type="button" class="delete-btn" onclick="deleteItem(${index})">Hapus</button>
+                </div>`;
+        });
+    }
+
+     // Ngmbil data dari server (PHP)
+    async function loadListFromServer() {
+        const res = await apiRequest("get"); // nyimpen ke array shoppingList
+        shoppingList = res.data || []; // nampilin ke halaman
+        renderList();
+    }
+
+     // nambah item baru ke server
+    async function addItem(e) {
+        e.preventDefault(); // Biar hlman ga reload halaman
+        const newItem = document.getElementById("newItem").value.trim();
+        if (!newItem) return showModal("Masukkan list barang belanjaan...");
+        const res = await apiRequest("add", { item: newItem });
+        if (res.status === "success") loadListFromServer();
+        else showModal(res.message);
+        document.getElementById("newItem").value = ""; // kosongin input
+    }
+
+    // Hapus item yang kita mau
+    function deleteItem(index) {
+        showModal(`Hapus "${shoppingList[index]}" dari daftar belanja?`, async () => {
+            const res = await apiRequest("delete", { index });
+            if (res.status === "success") loadListFromServer();
+            else showModal(res.message);
+        });
+    }
+
+     // Reset semua daftar belanja
+    function resetList() {
+        showModal("Reset daftar belanja ke pengaturan awal?", async () => {
+            await apiRequest("reset");
+            loadListFromServer();
+        });
+    }
+
+     // Fungsi umum request API ke PHP
+    async function apiRequest(action, data = {}) {
+        const res = await fetch(API_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action, ...data })
+        });
+        return res.json();
+    }
+
+     // tampilin Modal Konfirmasi (tampil saat hapus/reset)
+    function showModal(msg, callback) {
+        document.getElementById("confirmMessage").textContent = msg;
+        document.getElementById("confirmModal").style.display = "block";
+        pendingAction = callback; // Simpan action yang mau dijalankan setelah klik OKE
+    }
+
+    // Sembunyikan Modal (tutup pop-up nya)
+    function hideModal() {
+        document.getElementById("confirmModal").style.display = "none";
+    }
+
+     // Hindari script disisipin user
+    function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    let pendingAction = null; // Buat nyimpen action sementara waktu popup muncul
+    </script>
+</body>
+</html>
